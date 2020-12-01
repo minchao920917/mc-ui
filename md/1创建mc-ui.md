@@ -30,15 +30,21 @@
 ``` 
 const path = require('path')
 module.exports = {
-  // 修改 pages 入口
+
+  /*
+  构建多页面模式的应用程序.每个“页面”都应该有一个相应的JavaScript条目文件。该值应该是一
+  个对象，其中键是条目的名称，而该值要么是指定其条目、模板和文件名的对象，要么是指定其条目
+  的字符串，
+  注意：请保证pages里配置的路径和文件名 在你的文档目录都存在 否则启动服务会报错的
+  */
   pages: {
     index: {
       entry: 'examples/main.js', // 入口
       template: 'public/index.html', // 模板
       filename: 'index.html' // 输出文件
     }
-  },
-  // 扩展 webpack 配置
+  },  // 修改 pages 入口
+  
   chainWebpack: config => {
     // @ 默认指向 src 目录，这里要改成 examples
     // 另外也可以新增一个 ~ 指向 packages
@@ -57,12 +63,172 @@ module.exports = {
         // 修改它的选项...
         return options
       })
-  }
+  }         // 扩展 webpack 配置
 }
 
 ```
-`  这边我觉得有必要解释一下vue-cli3.0与vue-cli2.0的区别，3.0生成的项目远远比2.0精简了很多，比如项目的配置信息不再暴露在项目中，而是在你create vue xx-xx 后直接给你选项，你根据选项将配置信息写入到package.json中，然后npm i 之后，配置信息都保存在@vue目录下，这样vue3.0就实现了将配置文件完全的封装，但是，but，人是善变的，所以出于人性的考虑，你还可以像vue2.0那样通过在根目录下添加vue.config.js来DIY你要善变配置选项，包括baseUrl、pages、productionSourceMap等一系列参数`
+
+` 这边我觉得有必要解释一下vue-cli3.0与vue-cli2.0的区别，3.0生成的项目远远比2.0精简了很多，比如项目的配置信息不再暴露在项目中，而是在你create vue xx-xx 后直接给你选项，你根据选项将配置信息写入到package.json中，然后npm i 之后，配置信息都保存在@vue目录下，这样vue3.0就实现了将配置文件完全的封装，但是，but，人是善变的，所以出于人性的考虑，你还可以像vue2.0那样通过在根目录下添加vue.config.js来DIY你要善变配置选项，包括baseUrl、pages、productionSourceMap等一系列参数`
+
+vue.config.js中的pages是因为修改了文件夹的目录，需要重新制定出入口文件。chainWebpack经过链式的方式修改webpack的配置，常用于扩展webpack配置。
+
+这里就跑个题，稍微讲一下webpack的配置属性吧。
+
+```
+1、配置一个新的loader
+
+    config.module
+        .rule(name)
+            .use(name)
+            .loader(loader)
+            .options(options)
+
+        // 一个例子
+        config.module
+            .rule('graphql')
+            .test(/\.graphql$/)
+            .use('graphql-tag/loader')
+                .loader('graphql-tag/loader')
+                .end()
+        // 若是是非webpack-chain的话
+        module:{
+        rules:[
+            {
+            test:/\.graphql$/,
+            use::[
+                {
+                loader:"graphql-tag/loader"
+                }
+            ]
+            }
+        ]
+    }
+
+  2、设置别名
+
+  const path = require('path');
+    function resolve (dir) {
+        return path.join(__dirname, dir)
+    }
+    module.exports = {
+        lintOnSave: true,
+        chainWebpack: (config)=>{
+            config.resolve.alias
+                .set('@$', resolve('src'))
+                .set('assets',resolve('src/assets'))
+                .set('components',resolve('src/components'))
+                .set('layout',resolve('src/layout'))
+                .set('base',resolve('src/base'))
+                .set('static',resolve('src/static'))
+                .delete('base') // 删掉指定的别名
+                // .clear()  会把全部别名都删掉
+        }
+    }
+
+    3、修改入口和出口
+
+    chainWebpack: config => {
+        config.entryPoints.clear() // 会把默认的入口清空
+        config.entry('main').add('./src/main.js')//新增入口
+        config.entry('routes').add('./src/app-routes.js')//新增入口
 
 
-到这里，你可能会问了，vue-cli3.0
+        config.output
+                .path("dist")
+                .filename("[name].[chunkhash].js")
+                .chunkFilename("chunks/[name].[chunkhash].js")
+                .libraryTarget("umd")
+                .library();
+        }
 
+        // 其他的output配置
+        config.output
+        .auxiliaryComment(auxiliaryComment)
+        .chunkFilename(chunkFilename)
+        .chunkLoadTimeout(chunkLoadTimeout)
+        .crossOriginLoading(crossOriginLoading)
+        .devtoolFallbackModuleFilenameTemplate(devtoolFallbackModuleFilenameTemplate)
+        .devtoolLineToLine(devtoolLineToLine)
+        .devtoolModuleFilenameTemplate(devtoolModuleFilenameTemplate)
+        .filename(filename)
+        .hashFunction(hashFunction)
+        .hashDigest(hashDigest)
+        .hashDigestLength(hashDigestLength)
+        .hashSalt(hashSalt)
+        .hotUpdateChunkFilename(hotUpdateChunkFilename)
+        .hotUpdateFunction(hotUpdateFunction)
+        .hotUpdateMainFilename(hotUpdateMainFilename)
+        .jsonpFunction(jsonpFunction)
+        .library(library)
+        .libraryExport(libraryExport)
+        .libraryTarget(libraryTarget)
+        .path(path)
+        .pathinfo(pathinfo)
+        .publicPath(publicPath)
+        .sourceMapFilename(sourceMapFilename)
+        .sourcePrefix(sourcePrefix)
+        .strictModuleExceptionHandling(strictModuleExceptionHandling)
+        .umdNamedDefine(umdNamedDefine)
+
+    4、设置代理
+
+    chainWebpack: config => {
+        config.devServer.port(8888)
+        .open(true)
+        .proxy({'/dev': {
+                    target: 'http://123.57.153.106:8080/',
+                    changeOrigin: true,
+                    pathRewrite: {
+                    '^/dev': ''
+                    }
+                }
+            })
+    }
+    // chain其余队proxy的配置
+    config.devServer
+    .bonjour(bonjour)
+    .clientLogLevel(clientLogLevel)
+    .color(color)
+    .compress(compress)
+    .contentBase(contentBase)
+    .disableHostCheck(disableHostCheck)
+    .filename(filename)
+    .headers(headers)
+    .historyApiFallback(historyApiFallback)
+    .host(host)
+    .hot(hot)
+    .hotOnly(hotOnly)
+    .https(https)
+    .inline(inline)
+    .info(info)
+    .lazy(lazy)
+    .noInfo(noInfo)
+    .open(open)
+    .openPage(openPage)
+    .overlay(overlay)
+    .pfx(pfx)
+    .pfxPassphrase(pfxPassphrase)
+    .port(port)
+    .progress(progress)
+    .proxy(proxy)
+    .public(public)
+    .publicPath(publicPath)
+    .quiet(quiet)
+    .setup(setup)
+    .socket(socket)
+    .staticOptions(staticOptions)
+    .stats(stats)
+    .stdin(stdin)
+    .useLocalIp(useLocalIp)
+    .watchContentBase(watchContentBase)
+    .watchOptions(watchOptions)
+
+    等等
+```
+配置参考[webpack中文官网](https://www.webpackjs.com/configuration/plugins/#plugins)
+
+到这里，你就会发现，   `npm run serve`后便又能浏览器访问了。
+
+其实我对webpack也只是略懂皮毛而已，毕竟学到老，活到老，正常操作都是用的时候搜一下看一眼，不用就又忘了。
+
+既然如此，那我们是不是就可以来写我们的组件库了。
