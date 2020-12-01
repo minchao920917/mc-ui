@@ -232,3 +232,278 @@ vue.config.js中的pages是因为修改了文件夹的目录，需要重新制�
 其实我对webpack也只是略懂皮毛而已，毕竟学到老，活到老，正常操作都是用的时候搜一下看一眼，不用就又忘了。
 
 既然如此，那我们是不是就可以来写我们的组件库了。
+
+##      编写和测试自己第一个组件
+
+上一章，我们提到了如何创建一个组件库项目。讲了vue-cli3.0构建项目，并修改目录文件夹。添加新的vue.config.js来跑起来整个项目。准备工作也做的差不多了，那我们就来上手写我们的第一个组件吧。
+
+###  mc-btn 按钮组件
+
+写过代码的人都知道按钮组件是最常用的，也是最好实现的一个组件。
+
+1、第一步 在packages目录下创建一个文件夹命名为btn
+
+2、第二步再在btn文件夹下创建一个文件夹命名为src
+
+3、第三步，在src文件夹中创建一个同名的btn.vue单文件组件.内容
+
+```
+    <!--bnt.vue-->
+    <template>
+    <span class="mc-btn" @click="handleClick">
+        <slot></slot>  
+    </span>
+    </template>
+
+    <script>
+    export default {
+    name: 'McBtn', // 这个名字很重要
+    data () {
+        return {
+        }
+    },
+    methods: {
+        handleClick () {
+        this.$emit('handleClick')
+        }
+    }
+    }
+    </script>
+
+    <style lang="scss" scoped>
+        .mc-btn {
+            display: inline-block;
+            width: 100px;
+            height: 50px;
+            line-height: 50px;
+            border-radius: 4px;
+            font-size: 4px;
+            text-align: center;
+            background: #09aeaf;
+            color: white;
+        }
+    </style>
+
+```
+4、第四步 在"./package/btn"下创建index.js
+
+```
+    import McBtn from './src/btn'
+    // 为组件提供 install 方法，供组件对外按需引入
+    // 所有组件，必须具有 install，才能使用 Vue.use()
+    McBtn.install = Vue => {
+    Vue.component(McBtn.name, McBtn)
+    }
+    export default McBtn
+
+```
+此一步意义是暴露该组件，注意组件必须要有install，才能被Vue.use(xx)使用.
+
+5、第五步，在 "/packages"下创建index.js
+
+```
+import McBtn from './btn';
+// 定义一个组件列表，将McBtn组件放入其中
+const components = [
+    McBtn
+    //... 未来其他的组件需要在开头引入
+]
+// 定义 调用vue的加载器方法，将 Vue 作为参数传入
+const install = function (Vue) {
+  // 判断是否安装
+  if (install.installed) return
+  install.installed = true
+  // 遍历组件列表，将组件注入进vue组件中
+  components.map(component => Vue.component(component.name, component))
+}
+
+// 判断调用vue加载器，实现全局加载
+if (typeof window !== 'undefined' && window.Vue) {
+  install(window.Vue)
+}
+
+export default {
+  install,
+  ...components
+}
+
+```
+
+此一步含义是装载所有组件，组件必须先声明，然后加载在组件列表中，再在加载器中循环调用加载。
+
+主要作用就是统一导出所有组件及暴露 install 方法。之前组件内的 index.js 只是安装单个组件，而现在这个 index.js 是循环安装所有组件，这样用户可以选择按需加载，也可以选择一次性加载。
+
+好了，到此，一个Btn组件就算是编写完成了。
+当前的目录结构为 ![WechatIMG21.jpeg](https://i.loli.net/2020/12/01/lCu7oHjPWQObkKd.jpg)
+
+##      测试编写的mc-btn组件
+
+组件已经写好了，那我们就来尝试使用一下吧。
+在当前项目中
+1、第一步，全局引入首先在 examples 下的 main.js 中引入刚刚写好的包，就像下面这样：
+```
+    import App from './App.vue'
+    //...
+
+    import McUI from "./../packages";
+    Vue.use(McUI);
+
+    //...
+    Vue.config.productionTip = false
+```
+
+此步是在本地编写文件时全局引入
+
+注意，当全局引入了这个McUI之后，发现会报错，可能是你这个项目的css-loader没对，因为我这默认的单文件组件中使用的是`<style lang="scss" scoped>`,意思是我编写的样式加载器应该是sass-loader，如果你引入的 `<style lang="lcss" scoped>`说明你需要引入less-loader
+
+  ```
+    npm install sass-loader node-sass
+
+    npm run serve //重启就又可以了
+  ```
+这一块特殊报错特殊处理吧！
+
+2、第二步，删除helloword.vue，在app.vue中修改为
+
+```
+    <template>
+    <div id="app">
+        <img alt="Vue logo" src="./assets/logo.png">
+        <mc-test></mc-test>
+    </div>
+    </template>
+
+    <script>
+
+
+    export default {
+    name: 'App',
+
+    }
+    </script>
+
+    <style>
+    #app {
+    font-family: Avenir, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-align: center;
+    color: #2c3e50;
+    margin-top: 60px;
+    }
+    </style>
+
+```
+
+刷新页面，可以看见页面变了
+
+![WechatIMG23.jpeg](https://i.loli.net/2020/12/01/UFpsfuQ57o6LP2M.jpg)
+
+到此，我们的mc-btn组件从，开发到测试就初步完成了。
+
+##      打包
+
+vue-cli3为我们提供了一个构建目标库的命令行：
+
+`vue-cli-service build --target lib --name xxx --dest lib [entry]`
+
+–target: 构建目标，默认为应用模式。这里修改为 lib 启用库模式。
+
+–dest : 输出目录，默认 dist。这里我们改成 lib
+
+[entry]: 入口文件，默认为 src/App.vue。
+
+这里我们指定编译 packages/ 组件库目录。
+
+在当前的    `package.json` 
+
+```
+    //...
+    "scripts": {
+        "serve": "vue-cli-service serve",
+        "build": "vue-cli-service build",
+        "lint": "vue-cli-service lint",
+        "lib": "vue-cli-service build --target lib --name  mc-ui --dest lib packages/index.js"
+    },
+    "dependencies": {
+    //...
+"lib": "vue-cli-service build --target lib --name  mc-ui --dest lib packages/index.js"
+
+```
+到此，新的打包命令就配置好了，执行    `npm run lib`
+等待打包结束，你会发现目录文件夹下多了个`lib`文件夹.
+![WechatIMG24.jpeg](https://i.loli.net/2020/12/01/ujCdW31Ey9Xlk7f.jpg)
+
+那么这个lib文件夹就是我们要发布的到 `npm`的包了。
+
+
+##      发布
+
+一切准备就绪，就差发布了！
+
+直接从  `https://www.npmjs.com/` 上注册，登陆，准备发布。
+
+npm账号包含三个部分：username、password、email
+分别是用户名、密码和邮箱，注册好之后要登陆你的邮箱去进行验证，验证通过才能`npm publish` ,如果是没验证的邮箱，当你在publish的时候会给你报403错。
+
+发包注意要点：
+
+1、首先命名不能重复 mc-ui本来就没有，但是一直给我报了一个相似名太多一直需要我重新更换名字，那我只能将   `mc-ui` 改成 `mch-ui`,不仅改了文件名，还修改了配置信息
+
+2、账号用户名密码不能写错
+
+3、其他的发包问题，还请自行百度，google也行！
+
+
+终于，历经千辛万苦，终于发了个mch-ui的包。那么问就当场来验证一下效果。
+
+
+##     验证mch-ui(万般无奈改了名字 ╭(╯^╰)╮)
+
+1、 cd到一个空文件夹下，使用`vue create test` 创建一个新的vue项目
+
+2、 `npm i mch-ui -S ` 引入mch-ui的组件库，当这一步执行完成之后，你会发现，node_modules下面多出了一个mch-ui的文件夹，里面是这样的。
+![WechatIMG25.jpeg](https://i.loli.net/2020/12/01/nGth3LpqYF7BPHy.jpg)
+能见到lib就说明咱们的组件库生效了可以引用了。
+
+3、在test项目下的src文件夹下的`main.js`
+
+```
+        import MCUI from "mch-ui";
+        import 'mch-ui/lib/mch-ui.css'
+        Vue.use(MCUI)
+
+```
+这里就是全局引入组件库
+
+4、在src下的`components/HelloWold.vue` 中输入
+
+```
+    //...
+    <template>
+        <div class="hello">
+            <h1>{{ msg }}</h1>
+            <mc-btn>这是一个按钮</mc-btn>
+        </div>
+    </template>
+    //...
+
+```
+
+5、 执行
+
+```
+    npm i
+    npm run serve
+```
+
+打开浏览器发现：
+
+![WechatIMG26.jpeg](https://i.loli.net/2020/12/01/8TnVrXOQSimqfxp.jpg)
+
+
+##      结尾
+
+万里长征第一步总算是踏出去了，后续就自由发挥吧，DIY各种自己的组件库吧。
+
+如果觉得可以，可以收藏此网页，也可以直接给
